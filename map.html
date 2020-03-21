@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Toronto Historical</title>
+<meta name="viewport" content="initial-scale=1.0">
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"></script>
+<script src="https://unpkg.com/esri-leaflet@2.3.3/dist/esri-leaflet-debug.js"></script>
+<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
+<script
+  src="https://code.jquery.com/jquery-3.1.1.min.js"
+  integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="
+  crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.js"></script>
+</head>
+<style>
+
+html {
+	padding:0;
+	margin:0;
+}
+
+  body {
+     margin:0;
+     padding:1px;
+     font-family: sans-serif;
+  }
+
+  #mapWrap {
+  	position: relative;
+  	height: 100vh;
+  	width: 100vw;
+
+  	/*max-heighx*/
+  }
+
+  #map {
+  	position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    height:;
+  }
+
+  #addInfoBox {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    display: none;
+  }
+
+  #dropdownWrap .text {
+    font-size:25px;
+  }
+
+  #mapLoader {
+    display: none;
+    z-index: 1000;
+  }
+
+  .ui.inverted.dimmer {
+    background-color: rgba(255,255,255,.6);
+  }
+
+  #infoBox {
+  	position: relative;
+    z-index:1001;
+  	box-sizing: border-box;
+  	background:#fff;
+  	color:#999;
+  	top:50px;
+  	left:50px;
+  	/*height: 300px;*/
+  	width:300px;
+  	font-size:16px;
+    -webkit-box-shadow: 5px 5px 10px 0px rgba(239,239,239,0.3);
+    -moz-box-shadow: 5px 5px 10px 0px rgba(239,239,239,0.3);
+    box-shadow: 5px 5px 10px 0px rgba(239,239,239,0.3);
+  }
+
+  #infoBox #closeBtn {
+    position: absolute;
+    top:10px;
+    right:10px;
+    /*padding:10px;*/
+  }
+
+  #infoBox #closeBtn:hover {
+    cursor: pointer;
+  }
+
+  #infoBox h2 {
+    margin-top:0;
+  	color:#333;
+  }
+
+  #infoBox .dropdown {
+  	font-weight:bold;
+  	color:#555;
+  }
+
+  #infoBox .note {
+  	margin-top:20px;
+    margin-bottom: 5px;
+  	font-size:12px;
+  }
+
+  #infoBox .note a{
+    color:#999;
+    font-weight: bold;
+  	text-decoration: none;
+  }
+
+  #contentBox {
+  	padding:20px;
+  }
+
+@media (max-width:650px) {
+  .leaflet-right {
+    display: none;
+  }
+  #infoBox {
+    top: 30px;
+    left: 0;
+    margin: auto;
+    width: 90%;
+    right: 0;
+  }
+}
+
+</style>
+
+<body>
+<div id="mapWrap">
+	<div id="map">
+  <div id="addInfoBox">
+    <button id="addInfoBtn" class="ui orange button">
+      Info
+    </button>
+  </div>
+  <div id="mapLoader" class="ui active inverted dimmer">
+    <div class="ui text loader"></div>
+  </div>
+	<div id="infoBox">
+		<div id="contentBox">
+      <button id="closeBtn" class="ui icon button">
+        <i class="close icon"></i>
+      </button>
+			<h2>Historical Maps of Toronto</h2>
+			<p>Use the dropdown to explore historical aerial imagery offered through Toronto's Open Data Portal</p>
+			<div id="dropdownWrap">
+				<span style="margin-right:10px;">Year:</span>
+				<div class="ui dropdown">
+				  <div class="text"></div>
+				  <i class="dropdown icon"></i>
+				</div>
+			</div>
+			<p class="note">Another mapping project by: <a style="color:#eb5200;" href="https://www.mapto.ca/" target="blank">MapTO</a></p>
+      <p style="margin-top:0;" class="note">Thanks to: <a href="https://open.toronto.ca/dataset/web-map-services/" target="blank">Toronto Open Data</a>, <a href="" target="blank">Github</a>, <a href="https://semantic-ui.com/" target="blank">Semantic UI</a>, <a href="https://leafletjs.com/" target="blank">Leaflet</a>, and <a href="http://esri.github.io/esri-leaflet/" target="blank">ESRI</a></p>
+		</div>
+	</div>
+</div>
+
+<script>
+
+var newLayer, currentLayer, currentLayerVal;
+
+var southWest = new L.LatLng(43.646967, -79.389854),
+    northEast = new L.LatLng(43.657091, -79.377131),
+    bounds = new L.LatLngBounds(southWest, northEast);
+
+var maxSouthWest = new L.LatLng(43.441556, -79.682698),
+    maxNorthEast = new L.LatLng(44.052405, -78.964867),
+    maxBounds = new L.LatLngBounds(maxSouthWest, maxNorthEast);
+
+var map = L.map('map', {
+	minZoom: 11,
+  zoomControl: false,
+  maxBounds: maxBounds
+});
+
+currentLayer = L.esri.dynamicMapLayer({
+  url: "https://gis.toronto.ca/arcgis/rest/services/basemap/cot_historic_aerial_1978/MapServer/WMTS/"
+}).addTo(map);
+
+
+// currentLayer.setLayers({url: "https://gis.toronto.ca/arcgis/rest/services/basemap/cot_historic_aerial_1939/MapServer/WMTS/"});
+
+
+L.control.zoom({
+    position: 'topright'
+}).addTo(map);
+
+
+
+map.fitBounds(bounds);
+
+
+$('#closeBtn').click(function() {
+  document.getElementById('infoBox').style.display = 'none';
+  document.getElementById('addInfoBox').style.display = 'block';
+});
+
+$('#addInfoBtn').click(function() {
+  document.getElementById('infoBox').style.display = 'block';
+  document.getElementById('addInfoBox').style.display = 'none';
+});
+
+$('.ui.dropdown')
+  .dropdown({
+    values: [
+      {
+      	name: 'Latest',
+      	value: 'https://gis.toronto.ca/arcgis/rest/services/primary/cot_ortho_webm/MapServer/WMTS/'
+      },
+      {
+        name: '2017',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/primary/cot_ortho_2017_color_8cm_webm/MapServer/WMTS/'
+      },
+      {
+        name: '2016',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/primary/cot_ortho_2016_color_8cm_webm/MapServer/WMTS/'
+      },
+      {
+        name: '2015',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/primary/cot_ortho_2015_color_8cm_webm/MapServer/WMTS/'
+      },
+      {
+        name: '2012',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/primary/cot_ortho_2012_color_5cm_webm/MapServer/WMTS/'
+      },
+      {
+        name: '2011',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/primary/cot_ortho_2011_color_10cm_webm/MapServer/WMTS/'
+      },
+      {
+        name: '1978',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/basemap/cot_historic_aerial_1978/MapServer/WMTS/',
+        selected : true
+      },
+      {
+        name: '1965',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/basemap/cot_historic_aerial_1965/MapServer/WMTS/'
+      },
+      {
+        name: '1954',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/basemap/cot_historic_aerial_1954/MapServer/WMTS/'
+      },
+      {
+        name: '1939',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/basemap/cot_historic_aerial_1939/MapServer/WMTS/'
+      },
+      {
+        name: '1931',
+        value: 'https://gis.toronto.ca/arcgis/rest/services/basemap/cot_historic_aerial_1931/MapServer/WMTS/'
+      }
+    ],
+    onChange: function(val, text) {
+      console.log('change', text);
+      console.log('change', val);
+      document.getElementById('mapLoader').style.display = 'inherit';
+      // currentLayer.setLayers({url: val});
+      
+      newLayer = L.esri.dynamicMapLayer({
+        // url: "https://gis.toronto.ca/arcgis/rest/services/primary/cot_ortho_2017_color_8cm_webm/MapServer/WMTS/",
+        url: val
+        // url: "https://gis.toronto.ca/arcgis/rest/services/basemap/cot_historic_aerial_1939/MapServer/WMTS/",
+        // opacity : 1
+        // useCors: false,
+        // f: 'image'
+      });
+
+      newLayer.on('load', function(e) {
+        console.log('e', e);
+        if (val != currentLayerVal) {
+          map.removeLayer(currentLayer);
+          currentLayer = newLayer;
+          currentLayerVal = val;
+          document.getElementById('mapLoader').style.display = 'none';
+        }
+        if (text === '1931') {
+          // map.setZoom(12);
+          // map.setCenter([43.622324, -79.377840])
+          map.flyTo([43.622324, -79.377840], 12);
+        }
+      });
+
+      newLayer.addTo(map);
+
+      // console.log(currentLayer.getLayers());
+    }
+  });
+
+
+// $('.ui.dropdown')
+//   .dropdown({
+//    onChange: function() {...}
+//   });
+
+
+function closeInfo() {
+
+}
+
+  // var parks = L.esri.featureLayer({
+  //   url: "https://gis.toronto.ca/arcgis/rest/services/primary/cot_ortho_2017_color_8cm_webm/MapServer/WMTS/",
+  //   style: function () {
+  //     return { color: "#70ca49", weight: 2 };
+  //   }
+  // }).addTo(map);
+
+  // var popupTemplate = "<h3>{NAME}</h3>{ACRES} Acres<br><small>Property ID: {PROPERTYID}<small>";
+
+  // parks.bindPopup(function(e){
+  //   return L.Util.template(popupTemplate, e.feature.properties)
+  // });
+</script>
+</body>
+</html>
